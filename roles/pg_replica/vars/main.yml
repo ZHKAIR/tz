@@ -1,3 +1,10 @@
 ---
-db_name: example_db
-app_name: test
+
+# maps ansible_* to the pgdg repository package name
+postgresql_pgdg_families:
+  # default: redhat
+  Fedora: fedora
+
+postgresql_pgdg_shortfamilies:
+  # default: EL
+  Fedora: F
