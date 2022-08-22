@@ -1,0 +1,6 @@
+- hosts: tz_vm
+  become: yes
+  vars:
+    postgresql_backup_dir: /backups
+  roles:
+    - pg_replica
