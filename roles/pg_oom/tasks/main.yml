@@ -1,0 +1,17 @@
+---
+- name: "Show PID"
+  postgresql_query:
+    db: "postgres"
+    query: "SELECT pg_backend_pid();"
+  register: PID
+
+- name: "PID N"
+  debug:
+    msg: "PID IS {{ PID.query_result[0].pg_backend_pid }}"
+
+- name: "Edit oom_score_adj value"
+  shell: |
+    echo '1000 > /proc/{{ PID.query_result[0].pg_backend_pid }}/oom_score_adj'
+
+- name: "Show oom_score_adj"
+  shell: cat /proc/{{ PID.query_result[0].pg_backend_pid }}/oom_score_adj

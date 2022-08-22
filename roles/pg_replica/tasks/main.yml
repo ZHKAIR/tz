@@ -1,0 +1,7 @@
+- name: "Back up the database"
+  postgresql_db:
+    state: dump
+    name: "example_db"
+    target: "/backups/example_db.dump.gz"
+  become: yes
+  become_user: postgres

@@ -1,0 +1,5 @@
+- hosts: tz_vm
+  become: yes
+  become_user: postgres
+  roles:
+    - pg_oom
