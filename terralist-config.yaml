@@ -1,0 +1,44 @@
+# Пример конфигурационного файла Terralist
+# Этот файл НЕ обязателен - все можно настроить через переменные окружения
+
+log:
+  level: debug
+
+server:
+  host: 0.0.0.0
+  port: 5758
+
+url: https://terralist.caas.k-mkaas-dev-1.cloud.preprod.world
+
+database:
+  backend: sqlite
+  sqlite:
+    path: /home/terralist/.terralist.d/terralist.db
+
+oauth:
+  provider: oidc
+
+oidc:
+  scope: "openid email profile"
+  client-id: "your-client-id"
+  client-secret: "your-client-secret"
+  authorize-url: "https://your-keycloak/protocol/openid-connect/auth"
+  token-url: "https://your-keycloak/protocol/openid-connect/token"
+  userinfo-url: "https://your-keycloak/protocol/openid-connect/userinfo"
+
+# Секреты для токенов и куки
+token-signing-secret: "your-token-signing-secret"
+cookie-secret: "your-cookie-secret"
+
+# Разрешить анонимные загрузки
+allow-anonymous-downloads: true
+
+# S3 конфигурация
+s3:
+  endpoint: s-ed1.cloud.gcore.lu
+  bucket-name: terralist-artifacts
+  bucket-region: eu-central-1
+  access-key-id: BVQO6XXVBZAB6EYQX02G
+  secret-access-key: jlObBtZA7aJ7Gzx2b2vhzfK1MgrcS495Q5ChR3La
+  use-path-style: true
+  presign-expire: 15
