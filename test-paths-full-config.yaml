@@ -1,0 +1,114 @@
+# Тест с полной конфигурацией для разных путей
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pvc-paths-full
+spec:
+  enableServiceLinks: false
+  containers:
+  - name: test
+    image: ghcr.io/terralist/terralist:v0.8.0
+    command: ["/bin/sh", "-c"]
+    args:
+      - |
+        echo "=== Testing paths with full config ==="
+        
+        # Полный набор переменных
+        export TERRALIST_DATABASE_BACKEND=sqlite
+        export TERRALIST_SERVER_HOST=0.0.0.0
+        export TERRALIST_SERVER_PORT=5758
+        export TERRALIST_OAUTH_PROVIDER=oidc
+        export TERRALIST_OI_CLIENT_ID=test
+        export TERRALIST_OI_CLIENT_SECRET=test
+        export TERRALIST_OI_AUTHORIZE_URL=https://auth/authorize
+        export TERRALIST_OI_TOKEN_URL=https://auth/token
+        export TERRALIST_OI_USERINFO_URL=https://auth/userinfo
+        export TERRALIST_COOKIE_SECRET=test-cookie
+        export TERRALIST_TOKEN_SIGNING_SECRET=test-token
+        
+        # Test разных путей
+        for path in /mnt/data /var/data /opt/data /app/data /storage; do
+          mkdir -p $path
+          touch $path/test.db
+          export TERRALIST_SQLITE_PATH=$path/test.db
+          echo -e "\nTesting: $path/test.db"
+          timeout 3 /usr/local/bin/terralist server 2>&1 | head -5
+        done
+    volumeMounts:
+    - name: data
+      mountPath: /mnt/data
+  volumes:
+  - name: data
+    emptyDir: {}
+---
+# Финальный вариант StatefulSet с прямым использованием PVC
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: terralist-pvc-direct
+spec:
+  serviceName: terralist-pvc-direct
+  replicas: 1
+  selector:
+    matchLabels:
+      app: terralist-pvc-direct
+  template:
+    metadata:
+      labels:
+        app: terralist-pvc-direct
+    spec:
+      enableServiceLinks: false
+      initContainers:
+      - name: init-db
+        image: busybox:1.35
+        command: ['sh', '-c', 'mkdir -p /mnt/data && touch /mnt/data/terralist.db && chmod 666 /mnt/data/terralist.db && ls -la /mnt/data/']
+        volumeMounts:
+        - name: data
+          mountPath: /mnt/data
+      containers:
+      - name: terralist
+        image: ghcr.io/terralist/terralist:v0.8.0
+        ports:
+        - containerPort: 5758
+        env:
+        - name: TERRALIST_DATABASE_BACKEND
+          value: "sqlite"
+        - name: TERRALIST_SQLITE_PATH
+          value: "/mnt/data/terralist.db"
+        - name: TERRALIST_SERVER_HOST
+          value: "0.0.0.0"
+        - name: TERRALIST_SERVER_PORT
+          value: "5758"
+        - name: TERRALIST_URL
+          value: "https://terralist.example.com"
+        - name: TERRALIST_OAUTH_PROVIDER
+          value: "oidc"
+        - name: TERRALIST_OI_SCOPE
+          value: "openid email profile"
+        - name: TERRALIST_OI_CLIENT_ID
+          value: "test-client"
+        - name: TERRALIST_OI_CLIENT_SECRET
+          value: "test-secret"
+        - name: TERRALIST_OI_AUTHORIZE_URL
+          value: "https://auth/authorize"
+        - name: TERRALIST_OI_TOKEN_URL
+          value: "https://auth/token"
+        - name: TERRALIST_OI_USERINFO_URL
+          value: "https://auth/userinfo"
+        - name: TERRALIST_COOKIE_SECRET
+          value: "test-cookie-secret"
+        - name: TERRALIST_TOKEN_SIGNING_SECRET
+          value: "test-token-secret"
+        - name: TERRALIST_ALLOW_ANONYMOUS_DOWNLOADS
+          value: "true"
+        volumeMounts:
+        - name: data
+          mountPath: /mnt/data
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 1Gi
