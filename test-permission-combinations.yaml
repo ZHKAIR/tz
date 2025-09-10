@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-permissions-combo
+spec:
+  enableServiceLinks: false
+  containers:
+  - name: test
+    image: ghcr.io/terralist/terralist:v0.8.0
+    command: ["/bin/sh", "-c"]
+    args:
+      - |
+        echo "=== Testing different permission combinations ==="
+        
+        # Все env переменные для Terralist
+        export TERRALIST_DATABASE_BACKEND=sqlite
+        export TERRALIST_SERVER_HOST=0.0.0.0
+        export TERRALIST_SERVER_PORT=5758
+        export TERRALIST_URL=https://terralist.example.com
+        export TERRALIST_OAUTH_PROVIDER=oidc
+        export TERRALIST_OI_SCOPE="openid email profile"
+        export TERRALIST_OI_CLIENT_ID=test-client
+        export TERRALIST_OI_CLIENT_SECRET=test-secret
+        export TERRALIST_OI_AUTHORIZE_URL=https://auth/authorize
+        export TERRALIST_OI_TOKEN_URL=https://auth/token
+        export TERRALIST_OI_USERINFO_URL=https://auth/userinfo
+        export TERRALIST_COOKIE_SECRET=test-cookie-secret-32-characters
+        export TERRALIST_TOKEN_SIGNING_SECRET=test-token
+        export TERRALIST_ALLOW_ANONYMOUS_DOWNLOADS=true
+        
+        echo "Current user: $(whoami) (UID: $(id -u), GID: $(id -g))"
+        
+        # Test 1: Directory 777, File 666
+        echo -e "\n=== Test 1: Dir 777, File 666 ==="
+        mkdir -p /test1 && chmod 777 /test1
+        touch /test1/terralist.db && chmod 666 /test1/terralist.db
+        export TERRALIST_SQLITE_PATH=/test1/terralist.db
+        timeout 5 /usr/local/bin/terralist server 2>&1 | grep -E "(started|error|panic)" | head -3
+        
+        # Test 2: Directory 755, File 666
+        echo -e "\n=== Test 2: Dir 755, File 666 ==="
+        mkdir -p /test2 && chmod 755 /test2
+        touch /test2/terralist.db && chmod 666 /test2/terralist.db
+        export TERRALIST_SQLITE_PATH=/test2/terralist.db
+        timeout 5 /usr/local/bin/terralist server 2>&1 | grep -E "(started|error|panic)" | head -3
+        
+        # Test 3: Let Terralist create the file
+        echo -e "\n=== Test 3: Let Terralist create file ==="
+        mkdir -p /test3 && chmod 777 /test3
+        export TERRALIST_SQLITE_PATH=/test3/terralist.db
+        timeout 5 /usr/local/bin/terralist server 2>&1 | grep -E "(started|error|panic)" | head -3
+        
+        # Test 4: Using /tmp (should always work)
+        echo -e "\n=== Test 4: Using /tmp ==="
+        export TERRALIST_SQLITE_PATH=/tmp/terralist.db
+        timeout 5 /usr/local/bin/terralist server 2>&1 | grep -E "(started|error|panic)" | head -3
+        
+        echo -e "\n=== All tests completed ==="
+    volumeMounts:
+    - name: data
+      mountPath: /mnt/data
+  volumes:
+  - name: data
+    emptyDir: {}

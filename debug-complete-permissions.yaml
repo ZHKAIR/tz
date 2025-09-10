@@ -1,0 +1,161 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: debug-terralist-complete
+spec:
+  enableServiceLinks: false
+  initContainers:
+  - name: init-setup
+    image: busybox:1.35
+    command: ['sh', '-c']
+    args:
+      - |
+        echo "=== Init container (running as root) ==="
+        mkdir -p /mnt/data
+        chmod 777 /mnt/data
+        touch /mnt/data/terralist.db
+        chmod 666 /mnt/data/terralist.db
+        echo "Permissions set:"
+        ls -la /mnt/data/
+    volumeMounts:
+    - name: data
+      mountPath: /mnt/data
+    securityContext:
+      runAsUser: 0
+  containers:
+  - name: terralist
+    image: ghcr.io/terralist/terralist:v0.8.0
+    command: ["/bin/sh", "-c"]
+    args:
+      - |
+        echo "=== Terralist container user info ==="
+        echo "User ID: $(id -u)"
+        echo "Group ID: $(id -g)"
+        echo "Username: $(whoami)"
+        
+        echo -e "\n=== Permissions check ==="
+        ls -la /mnt/data/
+        
+        echo -e "\n=== Write test ==="
+        echo "test" >> /mnt/data/terralist.db && echo "✓ Write test PASSED" || echo "✗ Write test FAILED"
+        
+        echo -e "\n=== Starting Terralist with full config ==="
+        exec /usr/local/bin/terralist server
+    env:
+    - name: TERRALIST_DATABASE_BACKEND
+      value: "sqlite"
+    - name: TERRALIST_SQLITE_PATH
+      value: "/mnt/data/terralist.db"
+    - name: TERRALIST_SERVER_HOST
+      value: "0.0.0.0"
+    - name: TERRALIST_SERVER_PORT
+      value: "5758"
+    - name: TERRALIST_URL
+      value: "https://terralist.example.com"
+    - name: TERRALIST_OAUTH_PROVIDER
+      value: "oidc"
+    - name: TERRALIST_OI_SCOPE
+      value: "openid email profile"
+    - name: TERRALIST_OI_CLIENT_ID
+      value: "test-client-id"
+    - name: TERRALIST_OI_CLIENT_SECRET
+      value: "test-client-secret"
+    - name: TERRALIST_OI_AUTHORIZE_URL
+      value: "https://keycloak.example.com/protocol/openid-connect/auth"
+    - name: TERRALIST_OI_TOKEN_URL
+      value: "https://keycloak.example.com/protocol/openid-connect/token"
+    - name: TERRALIST_OI_USERINFO_URL
+      value: "https://keycloak.example.com/protocol/openid-connect/userinfo"
+    - name: TERRALIST_COOKIE_SECRET
+      value: "test-cookie-secret-minimum-32-chars"
+    - name: TERRALIST_TOKEN_SIGNING_SECRET
+      value: "test-token-secret"
+    - name: TERRALIST_ALLOW_ANONYMOUS_DOWNLOADS
+      value: "true"
+    volumeMounts:
+    - name: data
+      mountPath: /mnt/data
+  volumes:
+  - name: data
+    emptyDir: {}
+---
+# Тест с PVC вместо emptyDir
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: debug-terralist-pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: debug-terralist-with-pvc
+spec:
+  enableServiceLinks: false
+  initContainers:
+  - name: init-setup
+    image: busybox:1.35
+    command: ['sh', '-c']
+    args:
+      - |
+        echo "=== Setting up PVC permissions ==="
+        mkdir -p /mnt/data
+        chmod 777 /mnt/data
+        if [ ! -f /mnt/data/terralist.db ]; then
+          touch /mnt/data/terralist.db
+        fi
+        chmod 666 /mnt/data/terralist.db
+        ls -la /mnt/data/
+    volumeMounts:
+    - name: data
+      mountPath: /mnt/data
+    securityContext:
+      runAsUser: 0
+  containers:
+  - name: terralist
+    image: ghcr.io/terralist/terralist:v0.8.0
+    ports:
+    - containerPort: 5758
+    env:
+    - name: TERRALIST_DATABASE_BACKEND
+      value: "sqlite"
+    - name: TERRALIST_SQLITE_PATH
+      value: "/mnt/data/terralist.db"
+    - name: TERRALIST_SERVER_HOST
+      value: "0.0.0.0"
+    - name: TERRALIST_SERVER_PORT
+      value: "5758"
+    - name: TERRALIST_URL
+      value: "https://terralist.example.com"
+    - name: TERRALIST_OAUTH_PROVIDER
+      value: "oidc"
+    - name: TERRALIST_OI_SCOPE
+      value: "openid email profile"
+    - name: TERRALIST_OI_CLIENT_ID
+      value: "test-client-id"
+    - name: TERRALIST_OI_CLIENT_SECRET
+      value: "test-client-secret"
+    - name: TERRALIST_OI_AUTHORIZE_URL
+      value: "https://keycloak.example.com/protocol/openid-connect/auth"
+    - name: TERRALIST_OI_TOKEN_URL
+      value: "https://keycloak.example.com/protocol/openid-connect/token"
+    - name: TERRALIST_OI_USERINFO_URL
+      value: "https://keycloak.example.com/protocol/openid-connect/userinfo"
+    - name: TERRALIST_COOKIE_SECRET
+      value: "test-cookie-secret-minimum-32-chars"
+    - name: TERRALIST_TOKEN_SIGNING_SECRET
+      value: "test-token-secret"
+    - name: TERRALIST_ALLOW_ANONYMOUS_DOWNLOADS
+      value: "true"
+    volumeMounts:
+    - name: data
+      mountPath: /mnt/data
+  volumes:
+  - name: data
+    persistentVolumeClaim:
+      claimName: debug-terralist-pvc
