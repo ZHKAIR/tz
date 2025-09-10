@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: debug-terralist-user
+spec:
+  enableServiceLinks: false
+  containers:
+  - name: debug
+    image: ghcr.io/terralist/terralist:v0.8.0
+    command: ["/bin/sh", "-c"]
+    args:
+      - |
+        echo "=== User and permissions info ==="
+        id
+        whoami
+        echo -e "\n=== Home directory ==="
+        echo "HOME=$HOME"
+        ls -la ~/ || echo "Cannot list home"
+        echo -e "\n=== /tmp permissions ==="
+        ls -la /tmp
+        echo -e "\n=== Test creating files in different locations ==="
+        touch /tmp/test1 && echo "✓ Can write to /tmp" || echo "✗ Cannot write to /tmp"
+        touch /mnt/test2 && echo "✓ Can write to /mnt" || echo "✗ Cannot write to /mnt"
+        touch /var/test3 && echo "✓ Can write to /var" || echo "✗ Cannot write to /var"
+        touch /opt/test4 && echo "✓ Can write to /opt" || echo "✗ Cannot write to /opt"
+        touch /test5 && echo "✓ Can write to /" || echo "✗ Cannot write to /"
+        
+        echo -e "\n=== Check if running as root ==="
+        if [ $(id -u) -eq 0 ]; then
+          echo "Running as ROOT"
+        else
+          echo "Running as non-root user: $(id -u)"
+        fi
+        
+        echo -e "\n=== Process info ==="
+        ps aux | grep terralist
+        
+        sleep 3600

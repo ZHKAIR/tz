@@ -1,0 +1,130 @@
+# Тестируем разные пути для базы данных с PVC
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-paths-with-pvc
+spec:
+  enableServiceLinks: false
+  containers:
+  - name: test
+    image: ghcr.io/terralist/terralist:v0.8.0
+    command: ["/bin/sh", "-c"]
+    args:
+      - |
+        echo "=== Testing different paths with mounted volume ==="
+        
+        # Базовые переменные
+        export TERRALIST_DATABASE_BACKEND=sqlite
+        export TERRALIST_SERVER_HOST=0.0.0.0
+        export TERRALIST_SERVER_PORT=5758
+        
+        # Test 1: /mnt/data
+        mkdir -p /mnt/data
+        touch /mnt/data/test.db
+        export TERRALIST_SQLITE_PATH=/mnt/data/test.db
+        echo -e "\nTest 1: /mnt/data/test.db"
+        timeout 5 /usr/local/bin/terralist server || echo "Failed or timeout"
+        
+        # Test 2: /var/data
+        mkdir -p /var/data
+        touch /var/data/test.db
+        export TERRALIST_SQLITE_PATH=/var/data/test.db
+        echo -e "\nTest 2: /var/data/test.db"
+        timeout 5 /usr/local/bin/terralist server || echo "Failed or timeout"
+        
+        # Test 3: /opt/data
+        mkdir -p /opt/data
+        touch /opt/data/test.db
+        export TERRALIST_SQLITE_PATH=/opt/data/test.db
+        echo -e "\nTest 3: /opt/data/test.db"
+        timeout 5 /usr/local/bin/terralist server || echo "Failed or timeout"
+        
+        # Test 4: /app/data
+        mkdir -p /app/data
+        touch /app/data/test.db
+        export TERRALIST_SQLITE_PATH=/app/data/test.db
+        echo -e "\nTest 4: /app/data/test.db"
+        timeout 5 /usr/local/bin/terralist server || echo "Failed or timeout"
+        
+        # Test 5: /storage
+        mkdir -p /storage
+        touch /storage/test.db
+        export TERRALIST_SQLITE_PATH=/storage/test.db
+        echo -e "\nTest 5: /storage/test.db"
+        timeout 5 /usr/local/bin/terralist server || echo "Failed or timeout"
+        
+        echo -e "\n=== All tests completed ==="
+    volumeMounts:
+    - name: data
+      mountPath: /mnt/data
+    - name: data
+      mountPath: /var/data
+    - name: data
+      mountPath: /opt/data
+    - name: data
+      mountPath: /app/data
+    - name: data
+      mountPath: /storage
+  volumes:
+  - name: data
+    emptyDir: {}
+---
+# Простой тест с конкретным путем
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: terralist-test-direct-pvc
+spec:
+  serviceName: terralist-test-direct-pvc
+  replicas: 1
+  selector:
+    matchLabels:
+      app: terralist-test-direct-pvc
+  template:
+    metadata:
+      labels:
+        app: terralist-test-direct-pvc
+    spec:
+      enableServiceLinks: false
+      containers:
+      - name: terralist
+        image: ghcr.io/terralist/terralist:v0.8.0
+        # Без securityContext!
+        env:
+        - name: TERRALIST_DATABASE_BACKEND
+          value: "sqlite"
+        - name: TERRALIST_SQLITE_PATH
+          value: "/mnt/data/terralist.db"  # Пробуем /mnt/data
+        - name: TERRALIST_SERVER_HOST
+          value: "0.0.0.0"
+        - name: TERRALIST_SERVER_PORT
+          value: "5758"
+        - name: TERRALIST_URL
+          value: "https://terralist.example.com"
+        - name: TERRALIST_OAUTH_PROVIDER
+          value: "oidc"
+        - name: TERRALIST_OI_CLIENT_ID
+          value: "test"
+        - name: TERRALIST_OI_CLIENT_SECRET
+          value: "test"
+        - name: TERRALIST_OI_AUTHORIZE_URL
+          value: "https://auth/authorize"
+        - name: TERRALIST_OI_TOKEN_URL
+          value: "https://auth/token"
+        - name: TERRALIST_OI_USERINFO_URL
+          value: "https://auth/userinfo"
+        - name: TERRALIST_COOKIE_SECRET
+          value: "test-cookie"
+        - name: TERRALIST_TOKEN_SIGNING_SECRET
+          value: "test-token"
+        volumeMounts:
+        - name: data
+          mountPath: /mnt/data
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 1Gi
