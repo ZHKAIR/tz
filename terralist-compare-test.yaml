@@ -1,0 +1,110 @@
+# Тест 1: Точная копия работающего Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: terralist-working-copy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: terralist-working-copy
+  template:
+    metadata:
+      labels:
+        app: terralist-working-copy
+    spec:
+      enableServiceLinks: false
+      containers:
+      - name: terralist
+        image: ghcr.io/terralist/terralist:v0.8.0
+        ports:
+        - name: http
+          containerPort: 5758
+          protocol: TCP
+        env:
+        - name: TERRALIST_DATABASE_BACKEND
+          value: "sqlite"
+        - name: TERRALIST_SQLITE_PATH
+          value: "/tmp/terralist.db"
+        - name: TERRALIST_SERVER_HOST
+          value: "0.0.0.0"
+        - name: TERRALIST_SERVER_PORT
+          value: "5758"
+        - name: TERRALIST_URL
+          value: "https://terralist.caas.k-mkaas-dev-1.cloud.preprod.world"
+        - name: TERRALIST_OAUTH_PROVIDER
+          value: "oidc"
+        - name: TERRALIST_OI_SCOPE
+          value: "openid email profile"
+        - name: TERRALIST_OI_CLIENT_ID
+          value: "test-client-id"
+        - name: TERRALIST_OI_CLIENT_SECRET
+          value: "test-client-secret"
+        - name: TERRALIST_OI_AUTHORIZE_URL
+          value: "https://keycloak/protocol/openid-connect/auth"
+        - name: TERRALIST_OI_TOKEN_URL
+          value: "https://keycloak/protocol/openid-connect/token"
+        - name: TERRALIST_OI_USERINFO_URL
+          value: "https://keycloak/protocol/openid-connect/userinfo"
+        - name: TERRALIST_COOKIE_SECRET
+          value: "test-cookie-secret"
+        - name: TERRALIST_TOKEN_SIGNING_SECRET
+          value: "test-token-secret"
+        - name: TERRALIST_ALLOW_ANONYMOUS_DOWNLOADS
+          value: "true"
+---
+# Тест 2: То же самое, но StatefulSet без volumeClaimTemplates
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: terralist-sts-no-volume
+spec:
+  serviceName: terralist-sts-no-volume
+  replicas: 1
+  selector:
+    matchLabels:
+      app: terralist-sts-no-volume
+  template:
+    metadata:
+      labels:
+        app: terralist-sts-no-volume
+    spec:
+      enableServiceLinks: false
+      containers:
+      - name: terralist
+        image: ghcr.io/terralist/terralist:v0.8.0
+        ports:
+        - name: http
+          containerPort: 5758
+          protocol: TCP
+        env:
+        - name: TERRALIST_DATABASE_BACKEND
+          value: "sqlite"
+        - name: TERRALIST_SQLITE_PATH
+          value: "/tmp/terralist.db"
+        - name: TERRALIST_SERVER_HOST
+          value: "0.0.0.0"
+        - name: TERRALIST_SERVER_PORT
+          value: "5758"
+        - name: TERRALIST_URL
+          value: "https://terralist.caas.k-mkaas-dev-1.cloud.preprod.world"
+        - name: TERRALIST_OAUTH_PROVIDER
+          value: "oidc"
+        - name: TERRALIST_OI_SCOPE
+          value: "openid email profile"
+        - name: TERRALIST_OI_CLIENT_ID
+          value: "test-client-id"
+        - name: TERRALIST_OI_CLIENT_SECRET
+          value: "test-client-secret"
+        - name: TERRALIST_OI_AUTHORIZE_URL
+          value: "https://keycloak/protocol/openid-connect/auth"
+        - name: TERRALIST_OI_TOKEN_URL
+          value: "https://keycloak/protocol/openid-connect/token"
+        - name: TERRALIST_OI_USERINFO_URL
+          value: "https://keycloak/protocol/openid-connect/userinfo"
+        - name: TERRALIST_COOKIE_SECRET
+          value: "test-cookie-secret"
+        - name: TERRALIST_TOKEN_SIGNING_SECRET
+          value: "test-token-secret"
+        - name: TERRALIST_ALLOW_ANONYMOUS_DOWNLOADS
+          value: "true"

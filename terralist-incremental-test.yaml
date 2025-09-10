@@ -1,0 +1,101 @@
+# Тест 3: StatefulSet с одной дополнительной переменной
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: terralist-test-log-level
+spec:
+  serviceName: terralist-test-log-level
+  replicas: 1
+  selector:
+    matchLabels:
+      app: terralist-test-log-level
+  template:
+    metadata:
+      labels:
+        app: terralist-test-log-level
+    spec:
+      enableServiceLinks: false
+      containers:
+      - name: terralist
+        image: ghcr.io/terralist/terralist:v0.8.0
+        env:
+        - name: TERRALIST_LOG_LEVEL
+          value: "debug"  # Добавляем только эту переменную
+        - name: TERRALIST_DATABASE_BACKEND
+          value: "sqlite"
+        - name: TERRALIST_SQLITE_PATH
+          value: "/tmp/terralist.db"
+        - name: TERRALIST_SERVER_HOST
+          value: "0.0.0.0"
+        - name: TERRALIST_SERVER_PORT
+          value: "5758"
+---
+# Тест 4: StatefulSet с securityContext
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: terralist-test-security
+spec:
+  serviceName: terralist-test-security
+  replicas: 1
+  selector:
+    matchLabels:
+      app: terralist-test-security
+  template:
+    metadata:
+      labels:
+        app: terralist-test-security
+    spec:
+      enableServiceLinks: false
+      containers:
+      - name: terralist
+        image: ghcr.io/terralist/terralist:v0.8.0
+        env:
+        - name: TERRALIST_DATABASE_BACKEND
+          value: "sqlite"
+        - name: TERRALIST_SQLITE_PATH
+          value: "/tmp/terralist.db"
+        - name: TERRALIST_SERVER_HOST
+          value: "0.0.0.0"
+        - name: TERRALIST_SERVER_PORT
+          value: "5758"
+        securityContext:
+          runAsUser: 1000
+          runAsGroup: 1000
+          runAsNonRoot: true
+---
+# Тест 5: StatefulSet с volumeMounts но без volume
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: terralist-test-mount
+spec:
+  serviceName: terralist-test-mount
+  replicas: 1
+  selector:
+    matchLabels:
+      app: terralist-test-mount
+  template:
+    metadata:
+      labels:
+        app: terralist-test-mount
+    spec:
+      enableServiceLinks: false
+      containers:
+      - name: terralist
+        image: ghcr.io/terralist/terralist:v0.8.0
+        env:
+        - name: TERRALIST_DATABASE_BACKEND
+          value: "sqlite"
+        - name: TERRALIST_SQLITE_PATH
+          value: "/tmp/terralist.db"
+        - name: TERRALIST_SERVER_HOST
+          value: "0.0.0.0"
+        - name: TERRALIST_SERVER_PORT
+          value: "5758"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: data
+        emptyDir: {}
