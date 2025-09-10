@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "terralist.fullname" . }}
+  labels:
+    {{- include "terralist.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "terralist.fullname" . }}
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "terralist.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "terralist.selectorLabels" . | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      containers:
+      - name: terralist
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        # НЕ указываем command и args - используем defaults из образа!
+        ports:
+        - name: http
+          containerPort: 5758
+          protocol: TCP
+        env:
+        - name: TERRALIST_LOG_LEVEL
+          value: "debug"
+        - name: TERRALIST_DATABASE_BACKEND
+          value: "sqlite"
+        - name: TERRALIST_SQLITE_PATH
+          value: "/tmp/terralist.db"  # Используем /tmp как в работающем deployment
+        - name: TERRALIST_SERVER_HOST
+          value: "0.0.0.0"
+        - name: TERRALIST_SERVER_PORT
+          value: "5758"
+        - name: TERRALIST_URL
+          value: "https://terralist.caas.k-mkaas-dev-1.cloud.preprod.world"
+        - name: TERRALIST_OAUTH_PROVIDER
+          value: "oidc"
+        - name: TERRALIST_OI_SCOPE
+          value: "openid email profile"
+        - name: TERRALIST_OI_CLIENT_ID
+          value: {{ .Values.config.auth.oauth.clientId | quote }}
+        - name: TERRALIST_OI_CLIENT_SECRET
+          value: {{ .Values.config.auth.oauth.clientSecret | quote }}
+        - name: TERRALIST_OI_AUTHORIZE_URL
+          value: "{{ .Values.config.auth.oauth.issuerUrl }}/protocol/openid-connect/auth"
+        - name: TERRALIST_OI_TOKEN_URL
+          value: "{{ .Values.config.auth.oauth.issuerUrl }}/protocol/openid-connect/token"
+        - name: TERRALIST_OI_USERINFO_URL
+          value: "{{ .Values.config.auth.oauth.issuerUrl }}/protocol/openid-connect/userinfo"
+        - name: TERRALIST_COOKIE_SECRET
+          value: {{ .Values.config.auth.cookieSecret | quote }}
+        - name: TERRALIST_TOKEN_SIGNING_SECRET
+          value: {{ .Values.config.auth.tokenSigningSecret | quote }}
+        - name: TERRALIST_ALLOW_ANONYMOUS_DOWNLOADS
+          value: "true"
+        - name: TERRALIST_S3_ENDPOINT
+          value: "s-ed1.cloud.gcore.lu"
+        - name: TERRALIST_S3_BUCKET_NAME
+          value: "terralist-artifacts"
+        - name: TERRALIST_S3_BUCKET_REGION
+          value: "eu-central-1"
+        - name: TERRALIST_S3_ACCESS_KEY_ID
+          value: "BVQO6XXVBZAB6EYQX02G"
+        - name: TERRALIST_S3_SECRET_ACCESS_KEY
+          value: "jlObBtZA7aJ7Gzx2b2vhzfK1MgrcS495Q5ChR3La"
+        - name: TERRALIST_S3_USE_PATH_STYLE
+          value: "true"
+        - name: TERRALIST_S3_PRESIGN_EXPIRE
+          value: "15"
+        securityContext:
+          runAsUser: 1000
+          runAsGroup: 1000
+        {{- if .Values.livenessProbe.enabled }}
+        livenessProbe:
+          tcpSocket:
+            port: {{ .Values.livenessProbe.tcpSocket.port }}
+          initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+          timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+          periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+          successThreshold: {{ .Values.livenessProbe.successThreshold }}
+          failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+        {{- end }}
+        {{- if .Values.readinessProbe.enabled }}
+        readinessProbe:
+          tcpSocket:
+            port: {{ .Values.readinessProbe.tcpSocket.port }}
+          initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+          timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+          periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+          successThreshold: {{ .Values.readinessProbe.successThreshold }}
+          failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+  # Примечание: База данных будет храниться в /tmp внутри контейнера
+  # Это означает, что данные будут потеряны при перезапуске пода
+  # Для постоянного хранения используйте volumeClaimTemplates
