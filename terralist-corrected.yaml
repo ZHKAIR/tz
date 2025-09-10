@@ -22,82 +22,68 @@ spec:
         command: ['sh', '-c']
         args:
           - |
-            echo "Creating data directory structure..."
-            mkdir -p /data
-            if [ ! -f /data/terralist.db ]; then
-              echo "Creating new database file..."
-              touch /data/terralist.db
-            fi
-            echo "Setting permissions..."
-            chown -R 1000:1000 /data
-            chmod -R 755 /data
-            chmod 644 /data/terralist.db
-            echo "Directory contents:"
-            ls -la /data/
-            echo "Init completed successfully"
+            # Создаем структуру директорий согласно документации Terralist
+            mkdir -p /home/terralist/.terralist.d
+            touch /home/terralist/.terralist.d/terralist.db
+            chown -R 1000:1000 /home/terralist
+            chmod -R 755 /home/terralist/.terralist.d
+            echo "Init completed. Directory structure:"
+            ls -la /home/terralist/
+            ls -la /home/terralist/.terralist.d/
         volumeMounts:
         - name: data
-          mountPath: /data
+          mountPath: /home/terralist
         securityContext:
           runAsUser: 0
-          runAsGroup: 0
       containers:
       - name: terralist
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
-        workingDir: /app/data
         ports:
         - name: http
           containerPort: 5758
           protocol: TCP
         env:
-        # Database configuration
+        # Указываем HOME директорию для пользователя
+        - name: HOME
+          value: "/home/terralist"
+        # Основная конфигурация согласно документации
+        - name: TERRALIST_LOG_LEVEL
+          value: "debug"
         - name: TERRALIST_DATABASE_BACKEND
           value: "sqlite"
         - name: TERRALIST_SQLITE_PATH
-          value: "/data/terralist.db"
-        
-        # Server configuration
+          value: "/home/terralist/.terralist.d/terralist.db"
         - name: TERRALIST_SERVER_HOST
           value: "0.0.0.0"
         - name: TERRALIST_SERVER_PORT
           value: "5758"
         - name: TERRALIST_URL
           value: "https://terralist.caas.k-mkaas-dev-1.cloud.preprod.world"
-        
-        # Logging
-        - name: TERRALIST_LOG_LEVEL
-          value: "debug"
-        
-        # OAuth configuration
+        # OAuth конфигурация - используем правильные имена переменных
         - name: TERRALIST_OAUTH_PROVIDER
           value: "oidc"
-        - name: TERRALIST_OIDC_SCOPE
+        - name: TERRALIST_OI_SCOPE
           value: "openid email profile"
-        - name: TERRALIST_OIDC_CLIENT_ID
+        - name: TERRALIST_OI_CLIENT_ID
           value: {{ .Values.config.auth.oauth.clientId | quote }}
-        - name: TERRALIST_OIDC_CLIENT_SECRET
+        - name: TERRALIST_OI_CLIENT_SECRET
           value: {{ .Values.config.auth.oauth.clientSecret | quote }}
-        - name: TERRALIST_OIDC_AUTHORIZE_URL
+        - name: TERRALIST_OI_AUTHORIZE_URL
           value: "{{ .Values.config.auth.oauth.issuerUrl }}/protocol/openid-connect/auth"
-        - name: TERRALIST_OIDC_TOKEN_URL
+        - name: TERRALIST_OI_TOKEN_URL
           value: "{{ .Values.config.auth.oauth.issuerUrl }}/protocol/openid-connect/token"
-        - name: TERRALIST_OIDC_USERINFO_URL
+        - name: TERRALIST_OI_USERINFO_URL
           value: "{{ .Values.config.auth.oauth.issuerUrl }}/protocol/openid-connect/userinfo"
-        
-        # Authentication secrets
+        # Секреты для аутентификации
         - name: TERRALIST_COOKIE_SECRET
           value: {{ .Values.config.auth.cookieSecret | quote }}
         - name: TERRALIST_TOKEN_SIGNING_SECRET
           value: {{ .Values.config.auth.tokenSigningSecret | quote }}
-        
-        # Anonymous access
-        - name: TERRALIST_MODULES_ANONYMOUS_READ
+        # Разрешаем анонимную загрузку
+        - name: TERRALIST_ALLOW_ANONYMOUS_DOWNLOADS
           value: "true"
-        
-        # S3 Storage configuration
-        - name: TERRALIST_STORAGE_BACKEND
-          value: "s3"
+        # S3 конфигурация
         - name: TERRALIST_S3_ENDPOINT
           value: "s-ed1.cloud.gcore.lu"
         - name: TERRALIST_S3_BUCKET_NAME
@@ -111,56 +97,36 @@ spec:
         - name: TERRALIST_S3_USE_PATH_STYLE
           value: "true"
         - name: TERRALIST_S3_PRESIGN_EXPIRE
-          value: "15m"
-        
+          value: "15"
         securityContext:
           runAsUser: 1000
           runAsGroup: 1000
           runAsNonRoot: true
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: false
-          capabilities:
-            drop:
-            - ALL
-        
         volumeMounts:
         - name: data
-          mountPath: /data
-        - name: config
-          mountPath: /config
-        
+          mountPath: /home/terralist
         {{- if .Values.livenessProbe.enabled }}
         livenessProbe:
-          httpGet:
-            path: /health
-            port: http
+          tcpSocket:
+            port: {{ .Values.livenessProbe.tcpSocket.port }}
           initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
           timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
           periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
           successThreshold: {{ .Values.livenessProbe.successThreshold }}
           failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
         {{- end }}
-        
         {{- if .Values.readinessProbe.enabled }}
         readinessProbe:
-          httpGet:
-            path: /health
-            port: http
+          tcpSocket:
+            port: {{ .Values.readinessProbe.tcpSocket.port }}
           initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
           timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
           periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
           successThreshold: {{ .Values.readinessProbe.successThreshold }}
           failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
         {{- end }}
-        
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
-      
-      volumes:
-      - name: config
-        configMap:
-          name: {{ include "terralist.fullname" . }}-config
-          
   volumeClaimTemplates:
   - metadata:
       name: data
