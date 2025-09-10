@@ -1,0 +1,50 @@
+# Common configuration values that are shared across environments
+# These values should not need to be changed frequently
+
+## Service configuration
+service:
+  type: ClusterIP
+  port: 5758
+
+## Resource limits - adjust based on your cluster capacity
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+## Probes configuration
+livenessProbe:
+  enabled: true
+  tcpSocket:
+    port: 5758
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+
+readinessProbe:
+  enabled: true
+  tcpSocket:
+    port: 5758
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+
+## Pod configuration
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "5758"
+  prometheus.io/path: "/metrics"
+
+## Security Context - DISABLED due to Terralist bug
+podSecurityContext:
+  enabled: false
+
+containerSecurityContext:
+  enabled: false

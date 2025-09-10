@@ -1,0 +1,108 @@
+# Application-specific configuration for Terralist
+# This file contains all values that need to be customized per deployment
+
+## Image configuration
+image:
+  registry: ghcr.io
+  repository: terralist/terralist
+  tag: "v0.8.0"
+  pullPolicy: IfNotPresent
+
+## Terralist configuration
+config:
+  ## URL where Terralist will be accessible
+  url: "https://terralist.example.com"
+  
+  ## Database configuration
+  database:
+    backend: "sqlite"
+    # SQLite path is automatically set based on persistence.enabled
+  
+  ## Server configuration
+  server:
+    host: "0.0.0.0"
+    port: "5758"
+    logLevel: "info"  # Options: debug, info, warn, error
+  
+  ## Authentication configuration
+  auth:
+    ## OAuth provider configuration
+    oauth:
+      provider: "oidc"  # Options: github, gitlab, oidc
+      clientId: "your-oidc-client-id"
+      clientSecret: "your-oidc-client-secret"
+      issuerUrl: "https://your-keycloak-domain.com/realms/your-realm"
+      scope: "openid email profile"
+    
+    ## Security secrets - CHANGE THESE!
+    cookieSecret: "change-me-to-32-character-secret-minimum-length"
+    tokenSigningSecret: "change-me-to-secure-secret"
+  
+  ## Anonymous access
+  allowAnonymousDownloads: true
+  
+  ## S3 Storage configuration for modules
+  s3:
+    enabled: true
+    endpoint: "s3.amazonaws.com"
+    bucketName: "terralist-modules"
+    bucketRegion: "us-east-1"
+    accessKeyId: "your-access-key-id"
+    secretAccessKey: "your-secret-access-key"
+    usePathStyle: false
+    presignExpire: "15m"  # Format: 15m, 1h, etc.
+
+## Ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+  hosts:
+    - host: terralist.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: terralist-tls
+      hosts:
+        - terralist.example.com
+
+## Persistence configuration
+persistence:
+  enabled: true
+  storageClass: "standard"  # Change to your storage class
+  size: 5Gi
+  # Use existingClaim if you want to use an existing PVC
+  # existingClaim: "terralist-data"
+
+## Extra environment variables (if needed)
+extraEnvVars: []
+  # - name: TERRALIST_CUSTOM_VAR
+  #   value: "custom-value"
+
+## Node selection (if needed)
+nodeSelector: {}
+  # disktype: ssd
+
+## Tolerations (if needed)
+tolerations: []
+  # - key: "dedicated"
+  #   operator: "Equal"
+  #   value: "terralist"
+  #   effect: "NoSchedule"
+
+## Affinity rules (if needed)
+affinity: {}
+  # podAntiAffinity:
+  #   preferredDuringSchedulingIgnoredDuringExecution:
+  #   - weight: 100
+  #     podAffinityTerm:
+  #       labelSelector:
+  #         matchExpressions:
+  #         - key: app.kubernetes.io/name
+  #           operator: In
+  #           values:
+  #           - terralist
+  #       topologyKey: kubernetes.io/hostname
