@@ -1,0 +1,146 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "terralist.fullname" . }}
+  labels:
+    {{- include "terralist.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "terralist.fullname" . }}
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "terralist.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "terralist.selectorLabels" . | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      {{- if .Values.persistence.enabled }}
+      initContainers:
+      - name: init-db-permissions
+        image: busybox:1.35
+        command: ['sh', '-c']
+        args:
+          - |
+            echo "=== Setting up database with universal permissions ==="
+            
+            # Создаем директорию с полными правами
+            mkdir -p /mnt/data
+            chmod 777 /mnt/data
+            echo "Directory created with 777 permissions"
+            
+            # Создаем файл базы данных если его нет
+            if [ ! -f /mnt/data/terralist.db ]; then
+              touch /mnt/data/terralist.db
+              echo "Database file created"
+            else
+              echo "Database file already exists"
+            fi
+            
+            # Даем полные права на чтение/запись для всех (owner, group, others)
+            chmod 666 /mnt/data/terralist.db
+            
+            # Дополнительно убеждаемся, что нет immutable флага
+            chattr -i /mnt/data/terralist.db 2>/dev/null || true
+            
+            # Проверяем результат
+            echo "=== Final permissions check ==="
+            ls -la /mnt/data/
+            
+            # Тест записи
+            echo "test" >> /mnt/data/terralist.db && echo "Write test: SUCCESS" || echo "Write test: FAILED"
+            
+            # Показываем информацию о файловой системе
+            echo "=== Filesystem info ==="
+            stat -f /mnt/data/ || stat /mnt/data/
+            
+        volumeMounts:
+        - name: data
+          mountPath: /mnt/data
+        securityContext:
+          runAsUser: 0  # Запускаем от root для установки прав
+          runAsGroup: 0
+      {{- end }}
+      containers:
+      - name: terralist
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        # НЕ используем securityContext в основном контейнере!
+        ports:
+        - name: http
+          containerPort: 5758
+          protocol: TCP
+        env:
+        - name: TERRALIST_DATABASE_BACKEND
+          value: "sqlite"
+        {{- if .Values.persistence.enabled }}
+        - name: TERRALIST_SQLITE_PATH
+          value: "/mnt/data/terralist.db"
+        {{- else }}
+        - name: TERRALIST_SQLITE_PATH
+          value: "/tmp/terralist.db"
+        {{- end }}
+        - name: TERRALIST_SERVER_HOST
+          value: "0.0.0.0"
+        - name: TERRALIST_SERVER_PORT
+          value: "5758"
+        - name: TERRALIST_URL
+          value: "https://terralist.caas.k-mkaas-dev-1.cloud.preprod.world"
+        - name: TERRALIST_OAUTH_PROVIDER
+          value: "oidc"
+        - name: TERRALIST_OI_SCOPE
+          value: "openid email profile"
+        - name: TERRALIST_OI_CLIENT_ID
+          value: {{ .Values.config.auth.oauth.clientId | quote }}
+        - name: TERRALIST_OI_CLIENT_SECRET
+          value: {{ .Values.config.auth.oauth.clientSecret | quote }}
+        - name: TERRALIST_OI_AUTHORIZE_URL
+          value: "{{ .Values.config.auth.oauth.issuerUrl }}/protocol/openid-connect/auth"
+        - name: TERRALIST_OI_TOKEN_URL
+          value: "{{ .Values.config.auth.oauth.issuerUrl }}/protocol/openid-connect/token"
+        - name: TERRALIST_OI_USERINFO_URL
+          value: "{{ .Values.config.auth.oauth.issuerUrl }}/protocol/openid-connect/userinfo"
+        - name: TERRALIST_COOKIE_SECRET
+          value: {{ .Values.config.auth.cookieSecret | quote }}
+        - name: TERRALIST_TOKEN_SIGNING_SECRET
+          value: {{ .Values.config.auth.tokenSigningSecret | quote }}
+        - name: TERRALIST_ALLOW_ANONYMOUS_DOWNLOADS
+          value: "true"
+        {{- if .Values.persistence.enabled }}
+        volumeMounts:
+        - name: data
+          mountPath: /mnt/data
+        {{- end }}
+        {{- if .Values.livenessProbe.enabled }}
+        livenessProbe:
+          tcpSocket:
+            port: {{ .Values.livenessProbe.tcpSocket.port }}
+          initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+          timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+          periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+          successThreshold: {{ .Values.livenessProbe.successThreshold }}
+          failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+        {{- end }}
+        {{- if .Values.readinessProbe.enabled }}
+        readinessProbe:
+          tcpSocket:
+            port: {{ .Values.readinessProbe.tcpSocket.port }}
+          initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+          timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+          periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+          successThreshold: {{ .Values.readinessProbe.successThreshold }}
+          failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+  {{- if .Values.persistence.enabled }}
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: {{ .Values.persistence.size | default "1Gi" }}
+  {{- end }}
