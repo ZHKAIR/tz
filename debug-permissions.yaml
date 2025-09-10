@@ -1,0 +1,55 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: debug-permissions
+spec:
+  enableServiceLinks: false
+  containers:
+  - name: debug
+    image: ghcr.io/terralist/terralist:v0.8.0
+    command: ["/bin/sh", "-c"]
+    args:
+      - |
+        echo "=== Current user info ==="
+        id
+        whoami
+        
+        echo -e "\n=== Testing write permissions ==="
+        # Тест записи в /mnt/data
+        mkdir -p /mnt/data
+        touch /mnt/data/test-write 2>&1 && echo "✓ Can create files in /mnt/data" || echo "✗ Cannot create files in /mnt/data"
+        
+        # Проверка существующего файла
+        if [ -f /mnt/data/terralist.db ]; then
+          echo -e "\n=== Existing database file ==="
+          ls -la /mnt/data/terralist.db
+          echo "Trying to write to existing file..."
+          echo "test" >> /mnt/data/terralist.db 2>&1 && echo "✓ Can write to db file" || echo "✗ Cannot write to db file"
+        fi
+        
+        echo -e "\n=== Mount point info ==="
+        mount | grep /mnt
+        df -h /mnt/data
+        
+        echo -e "\n=== Process info ==="
+        ps aux
+        
+        sleep 3600
+    volumeMounts:
+    - name: data
+      mountPath: /mnt/data
+  volumes:
+  - name: data
+    persistentVolumeClaim:
+      claimName: test-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: test-pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
