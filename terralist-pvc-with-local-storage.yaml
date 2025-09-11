@@ -1,0 +1,177 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "terralist.fullname" . }}
+  labels:
+    {{- include "terralist.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "terralist.fullname" . }}
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "terralist.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "terralist.selectorLabels" . | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      {{- if .Values.persistence.enabled }}
+      initContainers:
+      - name: init-permissions
+        image: busybox:1.35
+        command: ['sh', '-c']
+        args:
+          - |
+            echo "=== Setting up directory permissions ==="
+            
+            # База данных
+            mkdir -p /mnt/data
+            chmod 777 /mnt/data
+            if [ -f /mnt/data/terralist.db ]; then
+              echo "Database file exists, setting permissions..."
+              chmod 666 /mnt/data/terralist.db
+            else
+              echo "Database file does not exist, will be created by Terralist"
+            fi
+            
+            # Хранилище для модулей и провайдеров
+            echo "Creating storage directories..."
+            mkdir -p /mnt/data/storage/modules
+            mkdir -p /mnt/data/storage/providers
+            chmod -R 777 /mnt/data/storage
+            
+            echo "Directory structure:"
+            ls -la /mnt/data/
+            ls -la /mnt/data/storage/ || true
+        volumeMounts:
+        - name: data
+          mountPath: /mnt/data
+        securityContext:
+          runAsUser: 0
+      {{- end }}
+      containers:
+      - name: terralist
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: 5758
+          protocol: TCP
+        env:
+        - name: TERRALIST_LOG_LEVEL
+          value: {{ .Values.config.server.logLevel | quote }}
+        - name: TERRALIST_DATABASE_BACKEND
+          value: "sqlite"
+        {{- if .Values.persistence.enabled }}
+        - name: TERRALIST_SQLITE_PATH
+          value: "/mnt/data/terralist.db"
+        {{- else }}
+        - name: TERRALIST_SQLITE_PATH
+          value: "/tmp/terralist.db"
+        {{- end }}
+        - name: TERRALIST_SERVER_HOST
+          value: "0.0.0.0"
+        - name: TERRALIST_SERVER_PORT
+          value: "5758"
+        - name: TERRALIST_URL
+          value: {{ .Values.config.url | quote }}
+        
+        # Storage Resolvers - ВАЖНО!
+        {{- if .Values.persistence.enabled }}
+        - name: TERRALIST_MODULES_STORAGE_RESOLVER
+          value: "local"
+        - name: TERRALIST_PROVIDERS_STORAGE_RESOLVER
+          value: "local"
+        - name: TERRALIST_LOCAL_STORE
+          value: "/mnt/data/storage"
+        {{- else }}
+        - name: TERRALIST_MODULES_STORAGE_RESOLVER
+          value: "proxy"
+        - name: TERRALIST_PROVIDERS_STORAGE_RESOLVER
+          value: "proxy"
+        {{- end }}
+        
+        # OAuth configuration
+        - name: TERRALIST_OAUTH_PROVIDER
+          value: {{ .Values.config.auth.oauth.provider | quote }}
+        {{- if eq .Values.config.auth.oauth.provider "oidc" }}
+        - name: TERRALIST_OI_SCOPE
+          value: {{ .Values.config.auth.oauth.scope | quote }}
+        - name: TERRALIST_OI_CLIENT_ID
+          value: {{ .Values.config.auth.oauth.clientId | quote }}
+        - name: TERRALIST_OI_CLIENT_SECRET
+          value: {{ .Values.config.auth.oauth.clientSecret | quote }}
+        - name: TERRALIST_OI_AUTHORIZE_URL
+          value: "{{ .Values.config.auth.oauth.issuerUrl }}/protocol/openid-connect/auth"
+        - name: TERRALIST_OI_TOKEN_URL
+          value: "{{ .Values.config.auth.oauth.issuerUrl }}/protocol/openid-connect/token"
+        - name: TERRALIST_OI_USERINFO_URL
+          value: "{{ .Values.config.auth.oauth.issuerUrl }}/protocol/openid-connect/userinfo"
+        {{- end }}
+        - name: TERRALIST_COOKIE_SECRET
+          value: {{ .Values.config.auth.cookieSecret | quote }}
+        - name: TERRALIST_TOKEN_SIGNING_SECRET
+          value: {{ .Values.config.auth.tokenSigningSecret | quote }}
+        - name: TERRALIST_ALLOW_ANONYMOUS_DOWNLOADS
+          value: {{ .Values.config.allowAnonymousDownloads | quote }}
+        
+        # S3 configuration (если включен)
+        {{- if .Values.config.s3.enabled }}
+        - name: TERRALIST_MODULES_STORAGE_RESOLVER
+          value: "s3"
+        - name: TERRALIST_PROVIDERS_STORAGE_RESOLVER
+          value: "s3"
+        - name: TERRALIST_S3_ENDPOINT
+          value: {{ .Values.config.s3.endpoint | quote }}
+        - name: TERRALIST_S3_BUCKET_NAME
+          value: {{ .Values.config.s3.bucketName | quote }}
+        - name: TERRALIST_S3_BUCKET_REGION
+          value: {{ .Values.config.s3.bucketRegion | quote }}
+        - name: TERRALIST_S3_ACCESS_KEY_ID
+          value: {{ .Values.config.s3.accessKeyId | quote }}
+        - name: TERRALIST_S3_SECRET_ACCESS_KEY
+          value: {{ .Values.config.s3.secretAccessKey | quote }}
+        - name: TERRALIST_S3_USE_PATH_STYLE
+          value: {{ .Values.config.s3.usePathStyle | quote }}
+        - name: TERRALIST_S3_PRESIGN_EXPIRE
+          value: {{ .Values.config.s3.presignExpire | quote }}
+        {{- end }}
+        
+        {{- if .Values.persistence.enabled }}
+        volumeMounts:
+        - name: data
+          mountPath: /mnt/data
+        {{- end }}
+        {{- if .Values.livenessProbe.enabled }}
+        livenessProbe:
+          tcpSocket:
+            port: {{ .Values.livenessProbe.tcpSocket.port }}
+          initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+          successThreshold: {{ .Values.livenessProbe.successThreshold }}
+        {{- end }}
+        {{- if .Values.readinessProbe.enabled }}
+        readinessProbe:
+          tcpSocket:
+            port: {{ .Values.readinessProbe.tcpSocket.port }}
+          initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+          successThreshold: {{ .Values.readinessProbe.successThreshold }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+  {{- if .Values.persistence.enabled }}
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: {{ .Values.persistence.size | default "10Gi" }}
+  {{- end }}
