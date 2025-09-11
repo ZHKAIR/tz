@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: terralist-minimal
+spec:
+  containers:
+  - name: terralist
+    image: ghcr.io/terralist/terralist:0.8.0
+    # Пробуем разные варианты запуска
+    # Вариант 1: Не указываем command/args вообще
+    env:
+    - name: TERRALIST_LOG_LEVEL
+      value: "debug"
+    - name: TERRALIST_DATABASE_BACKEND
+      value: "sqlite"
+    - name: TERRALIST_SQLITE_PATH
+      value: "./terralist.db"
+    - name: TERRALIST_SERVER_HOST
+      value: "0.0.0.0"
+    - name: TERRALIST_SERVER_PORT
+      value: "5758"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: terralist-with-args
+spec:
+  containers:
+  - name: terralist
+    image: ghcr.io/terralist/terralist:0.8.0
+    # Вариант 2: Указываем только args
+    args: ["server"]
+    env:
+    - name: TERRALIST_LOG_LEVEL
+      value: "debug"
+    - name: TERRALIST_DATABASE_BACKEND
+      value: "sqlite"
+    - name: TERRALIST_SQLITE_PATH
+      value: "./terralist.db"
+    - name: TERRALIST_SERVER_HOST
+      value: "0.0.0.0"
+    - name: TERRALIST_SERVER_PORT
+      value: "5758"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: terralist-shell-wrapper
+spec:
+  containers:
+  - name: terralist
+    image: ghcr.io/terralist/terralist:0.8.0
+    # Вариант 3: Запускаем через shell
+    command: ["/bin/sh", "-c"]
+    args: ["cd /tmp && /terralist server"]
+    env:
+    - name: TERRALIST_LOG_LEVEL
+      value: "debug"
+    - name: TERRALIST_DATABASE_BACKEND
+      value: "sqlite"
+    - name: TERRALIST_SQLITE_PATH
+      value: "./terralist.db"
+    - name: TERRALIST_SERVER_HOST
+      value: "0.0.0.0"
+    - name: TERRALIST_SERVER_PORT
+      value: "5758"

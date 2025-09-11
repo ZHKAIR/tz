@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: terralist-minimal-test
+spec:
+  containers:
+  - name: terralist
+    image: ghcr.io/terralist/terralist:v0.8.0
+    # БЕЗ command и args
+    env:
+    - name: TERRALIST_DATABASE_BACKEND
+      value: "sqlite"
+    - name: TERRALIST_SQLITE_PATH
+      value: "/tmp/terralist.db"
+    - name: TERRALIST_SERVER_HOST
+      value: "0.0.0.0"
+    - name: TERRALIST_SERVER_PORT
+      value: "5758"
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: terralist-minimal
+spec:
+  serviceName: terralist-minimal
+  replicas: 1
+  selector:
+    matchLabels:
+      app: terralist-minimal
+  template:
+    metadata:
+      labels:
+        app: terralist-minimal
+    spec:
+      containers:
+      - name: terralist
+        image: ghcr.io/terralist/terralist:v0.8.0
+        # БЕЗ command и args
+        env:
+        - name: TERRALIST_DATABASE_BACKEND
+          value: "sqlite"
+        - name: TERRALIST_SQLITE_PATH
+          value: "/tmp/terralist.db"
+        - name: TERRALIST_SERVER_HOST
+          value: "0.0.0.0"
+        - name: TERRALIST_SERVER_PORT
+          value: "5758"

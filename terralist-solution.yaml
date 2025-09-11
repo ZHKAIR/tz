@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "terralist.fullname" . }}
+  labels:
+    {{- include "terralist.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "terralist.fullname" . }}
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "terralist.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "terralist.selectorLabels" . | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      initContainers:
+      - name: init-db
+        image: busybox:1.35
+        command: ['sh', '-c']
+        args:
+          - |
+            mkdir -p /data
+            if [ ! -f /data/terralist.db ]; then
+              touch /data/terralist.db
+            fi
+            chown -R 1000:1000 /data
+            chmod 755 /data
+            chmod 644 /data/terralist.db
+            ls -la /data/
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        securityContext:
+          runAsUser: 0
+      containers:
+      - name: terralist
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        # ВАЖНО: НЕ указываем command, чтобы использовался ENTRYPOINT из образа
+        # НЕ указываем args, если в entrypoint уже есть "server"
+        ports:
+        - name: http
+          containerPort: 5758
+          protocol: TCP
+        env:
+        # Минимальный набор переменных для начала
+        - name: TERRALIST_LOG_LEVEL
+          value: "debug"
+        - name: TERRALIST_DATABASE_BACKEND
+          value: "sqlite"
+        - name: TERRALIST_SQLITE_PATH
+          value: "/data/terralist.db"
+        - name: TERRALIST_SERVER_HOST
+          value: "0.0.0.0"
+        - name: TERRALIST_SERVER_PORT
+          value: "5758"
+        # После успешного запуска добавьте остальные переменные
+        securityContext:
+          runAsUser: 1000
+          runAsGroup: 1000
+          runAsNonRoot: true
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        livenessProbe:
+          tcpSocket:
+            port: 5758
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          tcpSocket:
+            port: 5758
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: {{ .Values.persistence.size }}

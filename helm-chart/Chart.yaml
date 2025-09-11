@@ -1,0 +1,16 @@
+apiVersion: v2
+name: terralist
+description: A Helm chart for Terralist - Terraform Registry
+type: application
+version: 1.0.0
+appVersion: "v0.8.0"
+keywords:
+  - terraform
+  - registry
+  - terralist
+home: https://terralist.io
+sources:
+  - https://github.com/terralist/terralist
+maintainers:
+  - name: Your Team
+    email: team@example.com

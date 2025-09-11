@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: debug-terralist-perms
+spec:
+  enableServiceLinks: false
+  initContainers:
+  - name: init-setup
+    image: busybox:1.35
+    command: ['sh', '-c']
+    args:
+      - |
+        mkdir -p /mnt/data
+        chmod 777 /mnt/data
+        touch /mnt/data/terralist.db
+        chmod 666 /mnt/data/terralist.db
+        echo "Init container (root):"
+        ls -la /mnt/data/
+    volumeMounts:
+    - name: data
+      mountPath: /mnt/data
+    securityContext:
+      runAsUser: 0
+  containers:
+  - name: terralist
+    image: ghcr.io/terralist/terralist:v0.8.0
+    command: ["/bin/sh", "-c"]
+    args:
+      - |
+        echo "=== Terralist container user info ==="
+        echo "User ID: $(id -u)"
+        echo "Group ID: $(id -g)"
+        echo "Username: $(whoami)"
+        echo "Groups: $(groups)"
+        
+        echo -e "\n=== Directory permissions ==="
+        ls -la /mnt/
+        ls -la /mnt/data/
+        
+        echo -e "\n=== Testing write access ==="
+        echo "test from terralist user" >> /mnt/data/terralist.db 2>&1 && echo "✓ Write SUCCESS" || echo "✗ Write FAILED: $?"
+        
+        echo -e "\n=== File info after write attempt ==="
+        ls -la /mnt/data/terralist.db
+        stat /mnt/data/terralist.db || true
+        
+        echo -e "\n=== Starting Terralist ==="
+        export TERRALIST_DATABASE_BACKEND=sqlite
+        export TERRALIST_SQLITE_PATH=/mnt/data/terralist.db
+        export TERRALIST_SERVER_HOST=0.0.0.0
+        export TERRALIST_SERVER_PORT=5758
+        export TERRALIST_OAUTH_PROVIDER=oidc
+        export TERRALIST_OI_CLIENT_ID=test
+        export TERRALIST_OI_CLIENT_SECRET=test
+        export TERRALIST_OI_AUTHORIZE_URL=https://auth/authorize
+        export TERRALIST_OI_TOKEN_URL=https://auth/token
+        export TERRALIST_OI_USERINFO_URL=https://auth/userinfo
+        export TERRALIST_COOKIE_SECRET=test-cookie
+        export TERRALIST_TOKEN_SIGNING_SECRET=test-token
+        
+        /usr/local/bin/terralist server
+    volumeMounts:
+    - name: data
+      mountPath: /mnt/data
+  volumes:
+  - name: data
+    emptyDir: {}

@@ -1,0 +1,121 @@
+# Вариант StatefulSet с использованием config файла
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "terralist.fullname" . }}-config
+data:
+  config.yaml: |
+    log:
+      level: debug
+    
+    server:
+      host: 0.0.0.0
+      port: 5758
+    
+    url: {{ .Values.config.url }}
+    
+    database:
+      backend: sqlite
+      sqlite:
+        path: /home/terralist/.terralist.d/terralist.db
+    
+    oauth:
+      provider: oidc
+    
+    oidc:
+      scope: "openid email profile"
+      client-id: {{ .Values.config.auth.oauth.clientId | quote }}
+      client-secret: {{ .Values.config.auth.oauth.clientSecret | quote }}
+      authorize-url: "{{ .Values.config.auth.oauth.issuerUrl }}/protocol/openid-connect/auth"
+      token-url: "{{ .Values.config.auth.oauth.issuerUrl }}/protocol/openid-connect/token"
+      userinfo-url: "{{ .Values.config.auth.oauth.issuerUrl }}/protocol/openid-connect/userinfo"
+    
+    token-signing-secret: {{ .Values.config.auth.tokenSigningSecret | quote }}
+    cookie-secret: {{ .Values.config.auth.cookieSecret | quote }}
+    
+    allow-anonymous-downloads: true
+    
+    s3:
+      endpoint: s-ed1.cloud.gcore.lu
+      bucket-name: terralist-artifacts
+      bucket-region: eu-central-1
+      access-key-id: {{ .Values.config.s3.accessKeyId | quote }}
+      secret-access-key: {{ .Values.config.s3.secretAccessKey | quote }}
+      use-path-style: true
+      presign-expire: 15
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "terralist.fullname" . }}
+spec:
+  serviceName: {{ include "terralist.fullname" . }}
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "terralist.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "terralist.selectorLabels" . | nindent 8 }}
+    spec:
+      initContainers:
+      - name: init-db
+        image: busybox:1.35
+        command: ['sh', '-c']
+        args:
+          - |
+            mkdir -p /home/terralist/.terralist.d
+            touch /home/terralist/.terralist.d/terralist.db
+            chown -R 1000:1000 /home/terralist
+            chmod -R 755 /home/terralist/.terralist.d
+        volumeMounts:
+        - name: data
+          mountPath: /home/terralist
+        securityContext:
+          runAsUser: 0
+      containers:
+      - name: terralist
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        # Запускаем с указанием config файла
+        command: ["/terralist"]
+        args: ["server", "--config", "/config/config.yaml"]
+        ports:
+        - name: http
+          containerPort: 5758
+          protocol: TCP
+        env:
+        # При использовании config файла нужна только HOME переменная
+        - name: HOME
+          value: "/home/terralist"
+        securityContext:
+          runAsUser: 1000
+          runAsGroup: 1000
+        volumeMounts:
+        - name: data
+          mountPath: /home/terralist
+        - name: config
+          mountPath: /config
+          readOnly: true
+        livenessProbe:
+          tcpSocket:
+            port: 5758
+          initialDelaySeconds: 30
+        readinessProbe:
+          tcpSocket:
+            port: 5758
+          initialDelaySeconds: 10
+      volumes:
+      - name: config
+        configMap:
+          name: {{ include "terralist.fullname" . }}-config
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: {{ .Values.persistence.size }}

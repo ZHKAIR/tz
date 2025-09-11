@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: terralist-debug
+spec:
+  containers:
+  - name: terralist
+    image: ghcr.io/terralist/terralist:latest  # Замените на вашу версию
+    command: ["/bin/sh"]
+    args: ["-c", "sleep infinity"]
+    env:
+    - name: TERRALIST_LOG_LEVEL
+      value: "debug"
+    volumeMounts:
+    - name: data
+      mountPath: /data
+  volumes:
+  - name: data
+    emptyDir: {}

@@ -1,0 +1,58 @@
+# Pod для отладки - точная копия того, что работает в Docker
+apiVersion: v1
+kind: Pod
+metadata:
+  name: terralist-debug-exact
+spec:
+  containers:
+  - name: terralist
+    image: ghcr.io/terralist/terralist:v0.8.0
+    # Не указываем command и args - используем defaults из образа
+    ports:
+    - containerPort: 5758
+    env:
+    - name: TERRALIST_LOG_LEVEL
+      value: "debug"
+---
+# Pod с явным указанием entrypoint
+apiVersion: v1
+kind: Pod  
+metadata:
+  name: terralist-debug-entrypoint
+spec:
+  containers:
+  - name: terralist
+    image: ghcr.io/terralist/terralist:v0.8.0
+    command: ["/usr/local/bin/docker-entrypoint.sh"]
+    args: ["server"]
+    ports:
+    - containerPort: 5758
+    env:
+    - name: TERRALIST_LOG_LEVEL
+      value: "debug"
+---
+# Pod для изучения entrypoint
+apiVersion: v1
+kind: Pod
+metadata:
+  name: terralist-debug-inspect
+spec:
+  containers:
+  - name: terralist
+    image: ghcr.io/terralist/terralist:v0.8.0
+    command: ["/bin/sh", "-c"]
+    args:
+      - |
+        echo "=== Ищем entrypoint ==="
+        find / -name "docker-entrypoint*" -type f 2>/dev/null
+        echo -e "\n=== Содержимое entrypoint (если найден) ==="
+        for f in $(find / -name "docker-entrypoint*" -type f 2>/dev/null); do
+          echo "File: $f"
+          cat "$f"
+          echo "---"
+        done
+        echo -e "\n=== Проверяем как запускается terralist ==="
+        /usr/local/bin/terralist --help || echo "Failed direct run"
+        echo -e "\n=== Пробуем server команду ==="
+        /usr/local/bin/terralist server --help || echo "Failed server command"
+        sleep 3600

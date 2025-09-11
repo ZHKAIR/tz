@@ -1,0 +1,243 @@
+# Default values for terralist
+# This is a YAML-formatted file
+# Declare variables to be passed into your templates
+
+## @section Global parameters
+global:
+  ## @param global.imageRegistry Global Docker image registry
+  imageRegistry: ""
+  ## @param global.imagePullSecrets Global Docker registry secret names as an array
+  imagePullSecrets: []
+  ## @param global.storageClass Global StorageClass for Persistent Volume(s)
+  storageClass: ""
+
+## @section Common parameters
+## @param nameOverride String to partially override common.names.fullname
+nameOverride: ""
+## @param fullnameOverride String to fully override common.names.fullname
+fullnameOverride: ""
+## @param commonLabels Labels to add to all deployed objects
+commonLabels: {}
+## @param commonAnnotations Annotations to add to all deployed objects
+commonAnnotations: {}
+
+## @section Terralist parameters
+## @param replicaCount Number of Terralist replicas to deploy
+replicaCount: 1
+
+## Terralist image
+## @param image.registry Terralist image registry
+## @param image.repository Terralist image repository
+## @param image.tag Terralist image tag (immutable tags are recommended)
+## @param image.pullPolicy Terralist image pull policy
+## @param image.pullSecrets Terralist image pull secrets
+image:
+  registry: ghcr.io
+  repository: terralist/terralist
+  tag: "v0.8.0"
+  ## Specify a imagePullPolicy
+  ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+  ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
+  pullPolicy: IfNotPresent
+  ## Optionally specify an array of imagePullSecrets
+  ## Secrets must be manually created in the namespace
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+  ## e.g:
+  ## pullSecrets:
+  ##   - myRegistryKeySecretName
+  pullSecrets: []
+
+## @section Service parameters
+## Terralist service parameters
+service:
+  ## @param service.type Terralist service type
+  type: ClusterIP
+  ## @param service.port Terralist service HTTP port
+  port: 5758
+  ## @param service.nodePort Node port for HTTP
+  ## NOTE: choose port between <30000-32767>
+  nodePort: ""
+  ## @param service.clusterIP Terralist service Cluster IP
+  ## e.g.:
+  ## clusterIP: None
+  clusterIP: ""
+  ## @param service.loadBalancerIP Terralist service Load Balancer IP
+  ## ref: https://kubernetes.io/docs/concepts/services-networking/service/#type-loadbalancer
+  loadBalancerIP: ""
+  ## @param service.loadBalancerSourceRanges Terralist service Load Balancer sources
+  ## ref: https://kubernetes.io/docs/tasks/access-application-cluster/configure-cloud-provider-firewall/#restrict-access-for-loadbalancer-service
+  ## e.g:
+  ## loadBalancerSourceRanges:
+  ##   - 10.10.10.0/24
+  loadBalancerSourceRanges: []
+  ## @param service.externalTrafficPolicy Terralist service external traffic policy
+  ## ref https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip
+  externalTrafficPolicy: Cluster
+  ## @param service.annotations Additional custom annotations for Terralist service
+  annotations: {}
+
+## @section Ingress parameters
+## Configure the ingress resource that allows you to access the Terralist
+## ref: https://kubernetes.io/docs/concepts/services-networking/ingress/
+ingress:
+  ## @param ingress.enabled Enable ingress record generation for Terralist
+  enabled: false
+  ## @param ingress.className IngressClass that will be be used to implement the Ingress (Kubernetes 1.18+)
+  ## This is supported in Kubernetes 1.18+ and required if you have more than one IngressClass marked as the default for your cluster
+  ## ref: https://kubernetes.io/blog/2020/04/02/improvements-to-the-ingress-api-in-kubernetes-1.18/
+  className: ""
+  ## @param ingress.annotations Additional annotations for the Ingress resource. To enable certificate autogeneration, place here your cert-manager annotations
+  ## Use this parameter to set the required annotations for cert-manager, see
+  ## ref: https://cert-manager.io/docs/usage/ingress/#supported-annotations
+  ## e.g:
+  ## annotations:
+  ##   kubernetes.io/ingress.class: nginx
+  ##   cert-manager.io/cluster-issuer: cluster-issuer-name
+  annotations: {}
+  ## @param ingress.hosts An array with the hosts configuration
+  ## e.g:
+  ## hosts:
+  ##   - host: terralist.local
+  ##     paths:
+  ##       - path: /
+  ##         pathType: Prefix
+  hosts:
+    - host: terralist.local
+      paths:
+        - path: /
+          pathType: Prefix
+  ## @param ingress.tls Enable TLS configuration for the host defined at `ingress.hosts` parameter
+  ## TLS certificates will be retrieved from a TLS secret with name: `{{- printf "%s-tls" .Values.ingress.hosts[0].host }}`
+  ## You can:
+  ##   - Use the `ingress.secrets` parameter to create this TLS secret
+  ##   - Rely on cert-manager to create it by setting the corresponding annotations
+  ##   - Rely on Helm to create self-signed certificates by setting `ingress.selfSigned=true`
+  tls: []
+
+## @section Persistence parameters
+## Enable persistence using Persistent Volume Claims
+## ref: https://kubernetes.io/docs/concepts/storage/persistent-volumes/
+persistence:
+  ## @param persistence.enabled Enable persistence using Persistent Volume Claims
+  enabled: true
+  ## @param persistence.storageClass Storage class of backing PVC
+  ## If defined, storageClassName: <storageClass>
+  ## If set to "-", storageClassName: "", which disables dynamic provisioning
+  ## If undefined (the default) or set to null, no storageClassName spec is
+  ##   set, choosing the default provisioner (gp2 on AWS, standard on
+  ##   GKE, AWS & OpenStack)
+  storageClass: ""
+  ## @param persistence.annotations Additional custom annotations for the PVC
+  annotations: {}
+  ## @param persistence.accessModes Persistent Volume access modes
+  accessModes:
+    - ReadWriteOnce
+  ## @param persistence.size Size of data volume
+  size: 1Gi
+  ## @param persistence.existingClaim The name of an existing PVC to use for persistence
+  existingClaim: ""
+  ## @param persistence.selector Selector to match an existing Persistent Volume for the claim
+  ## selector:
+  ##   matchLabels:
+  ##     app: my-app
+  selector: {}
+
+## @section Container parameters
+## Terralist container resource requests and limits
+## ref: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+## @param resources.limits The resources limits for the Terralist containers
+## @param resources.requests The requested resources for the Terralist containers
+resources:
+  limits: {}
+  requests: {}
+
+## Configure Pods Security Context
+## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod
+## @param podSecurityContext.enabled Enabled Terralist pods' Security Context
+## @param podSecurityContext.fsGroup Set Terralist pod's Security Context fsGroup
+podSecurityContext:
+  enabled: false
+  fsGroup: 1000
+
+## Configure Container Security Context
+## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container
+## @param containerSecurityContext.enabled Enabled Terralist containers' Security Context
+## @param containerSecurityContext.runAsUser Set Terralist containers' Security Context runAsUser
+## @param containerSecurityContext.runAsNonRoot Set Terralist containers' Security Context runAsNonRoot
+containerSecurityContext:
+  enabled: false
+  runAsUser: 1000
+  runAsNonRoot: true
+
+## @section Probes parameters
+## Configure extra options for Terralist containers' liveness and readiness probes
+## ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#configure-probes
+## @param livenessProbe.enabled Enable livenessProbe on Terralist containers
+## @param livenessProbe.initialDelaySeconds Initial delay seconds for livenessProbe
+## @param livenessProbe.periodSeconds Period seconds for livenessProbe
+## @param livenessProbe.timeoutSeconds Timeout seconds for livenessProbe
+## @param livenessProbe.failureThreshold Failure threshold for livenessProbe
+## @param livenessProbe.successThreshold Success threshold for livenessProbe
+livenessProbe:
+  enabled: true
+  tcpSocket:
+    port: 5758
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+
+## @param readinessProbe.enabled Enable readinessProbe on Terralist containers
+## @param readinessProbe.initialDelaySeconds Initial delay seconds for readinessProbe
+## @param readinessProbe.periodSeconds Period seconds for readinessProbe
+## @param readinessProbe.timeoutSeconds Timeout seconds for readinessProbe
+## @param readinessProbe.failureThreshold Failure threshold for readinessProbe
+## @param readinessProbe.successThreshold Success threshold for readinessProbe
+readinessProbe:
+  enabled: true
+  tcpSocket:
+    port: 5758
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+
+## @section Other parameters
+## @param podAnnotations Annotations for Terralist pods
+podAnnotations: {}
+
+## @param podLabels Extra labels for Terralist pods
+podLabels: {}
+
+## @param nodeSelector Node labels for pod assignment
+## ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
+nodeSelector: {}
+
+## @param tolerations Tolerations for pod assignment
+## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+tolerations: []
+
+## @param affinity Affinity for pod assignment
+## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+affinity: {}
+
+## @param extraEnvVars Array with extra environment variables to add to Terralist containers
+## e.g:
+## extraEnvVars:
+##   - name: FOO
+##     value: "bar"
+extraEnvVars: []
+
+## @param extraEnvVarsCM Name of existing ConfigMap containing extra env vars for Terralist containers
+extraEnvVarsCM: ""
+
+## @param extraEnvVarsSecret Name of existing Secret containing extra env vars for Terralist containers
+extraEnvVarsSecret: ""
+
+## @param extraVolumes Optionally specify extra list of additional volumes for the Terralist pod(s)
+extraVolumes: []
+
+## @param extraVolumeMounts Optionally specify extra list of additional volumeMounts for the Terralist container(s)
+extraVolumeMounts: []

@@ -1,0 +1,100 @@
+# Варианты отладки Terralist
+
+# 1. Pod для диагностики - выясняем как правильно запускать
+apiVersion: v1
+kind: Pod
+metadata:
+  name: terralist-debug
+spec:
+  containers:
+  - name: terralist
+    image: ghcr.io/terralist/terralist:latest  # Используйте вашу версию образа
+    command: ["/bin/sh", "-c"]
+    args:
+      - |
+        echo "=== Проверяем структуру файлов в образе ==="
+        ls -la /
+        echo ""
+        echo "=== Проверяем путь к бинарнику ==="
+        which terralist || echo "terralist not in PATH"
+        ls -la /terralist || echo "/terralist not found"
+        ls -la /usr/local/bin/terralist || echo "/usr/local/bin/terralist not found"
+        echo ""
+        echo "=== Проверяем ENTRYPOINT ==="
+        cat /proc/1/cmdline | tr '\0' ' ' || echo "Cannot read cmdline"
+        echo ""
+        echo "=== Пробуем запустить с --help ==="
+        /terralist --help || echo "Failed to run /terralist --help"
+        terralist --help || echo "Failed to run terralist --help"
+        echo ""
+        echo "=== Проверяем server команду ==="
+        /terralist server --help || echo "Failed to run server --help"
+        echo ""
+        echo "=== Держим контейнер запущенным ==="
+        sleep infinity
+    env:
+    - name: TERRALIST_LOG_LEVEL
+      value: "debug"
+    volumeMounts:
+    - name: data
+      mountPath: /data
+  volumes:
+  - name: data
+    emptyDir: {}
+
+---
+# 2. Вариант с явным указанием команды server
+apiVersion: v1
+kind: Pod
+metadata:
+  name: terralist-test-explicit
+spec:
+  containers:
+  - name: terralist
+    image: ghcr.io/terralist/terralist:latest
+    command: ["/terralist", "server"]
+    env:
+    - name: TERRALIST_LOG_LEVEL
+      value: "debug"
+    - name: TERRALIST_DATABASE_BACKEND
+      value: "sqlite"
+    - name: TERRALIST_SQLITE_PATH
+      value: "/data/terralist.db"
+    - name: TERRALIST_SERVER_HOST
+      value: "0.0.0.0"
+    - name: TERRALIST_SERVER_PORT
+      value: "5758"
+    volumeMounts:
+    - name: data
+      mountPath: /data
+  volumes:
+  - name: data
+    emptyDir: {}
+
+---
+# 3. Вариант без явного указания команды (используем ENTRYPOINT из образа)
+apiVersion: v1
+kind: Pod
+metadata:
+  name: terralist-test-default
+spec:
+  containers:
+  - name: terralist
+    image: ghcr.io/terralist/terralist:latest
+    env:
+    - name: TERRALIST_LOG_LEVEL
+      value: "debug"
+    - name: TERRALIST_DATABASE_BACKEND
+      value: "sqlite"
+    - name: TERRALIST_SQLITE_PATH
+      value: "/data/terralist.db"
+    - name: TERRALIST_SERVER_HOST
+      value: "0.0.0.0"
+    - name: TERRALIST_SERVER_PORT
+      value: "5758"
+    volumeMounts:
+    - name: data
+      mountPath: /data
+  volumes:
+  - name: data
+    emptyDir: {}

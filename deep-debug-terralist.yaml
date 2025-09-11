@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: terralist-deep-debug
+spec:
+  containers:
+  - name: terralist
+    image: ghcr.io/terralist/terralist:v0.8.0
+    command: ["/bin/sh", "-c"]
+    args:
+      - |
+        echo "=== Проверяем entrypoint скрипт ==="
+        cat /usr/local/bin/docker-entrypoint.sh
+        echo -e "\n=== Проверяем права на файлы ==="
+        ls -la /usr/local/bin/docker-entrypoint.sh
+        ls -la /usr/local/bin/terralist
+        echo -e "\n=== Пробуем запустить напрямую ==="
+        /usr/local/bin/terralist server --help 2>&1 || echo "Direct run failed"
+        echo -e "\n=== Пробуем через entrypoint ==="
+        /usr/local/bin/docker-entrypoint.sh server 2>&1 || echo "Entrypoint failed"
+        echo -e "\n=== Проверяем переменные окружения ==="
+        env | sort
+        echo -e "\n=== Держим контейнер ==="
+        sleep 3600
+    volumeMounts:
+    - name: data
+      mountPath: /data
+  volumes:
+  - name: data
+    emptyDir: {}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: terralist-test-direct
+spec:
+  containers:
+  - name: terralist
+    image: ghcr.io/terralist/terralist:v0.8.0
+    # Пробуем запустить напрямую без entrypoint
+    command: ["/usr/local/bin/terralist"]
+    args: ["server"]
+    env:
+    - name: TERRALIST_LOG_LEVEL
+      value: "debug"
+    - name: TERRALIST_DATABASE_BACKEND
+      value: "sqlite"
+    - name: TERRALIST_SQLITE_PATH
+      value: "/data/terralist.db"
+    - name: TERRALIST_SERVER_HOST
+      value: "0.0.0.0"
+    - name: TERRALIST_SERVER_PORT
+      value: "5758"
+    volumeMounts:
+    - name: data
+      mountPath: /data
+  volumes:
+  - name: data
+    emptyDir: {}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: terralist-test-wrapper
+spec:
+  containers:
+  - name: terralist
+    image: ghcr.io/terralist/terralist:v0.8.0
+    # Обходной путь через sh
+    command: ["/bin/sh", "-c"]
+    args: ["exec /usr/local/bin/docker-entrypoint.sh server"]
+    env:
+    - name: TERRALIST_LOG_LEVEL
+      value: "debug"
+    - name: TERRALIST_DATABASE_BACKEND
+      value: "sqlite"
+    - name: TERRALIST_SQLITE_PATH
+      value: "/data/terralist.db"
+    - name: TERRALIST_SERVER_HOST
+      value: "0.0.0.0"
+    - name: TERRALIST_SERVER_PORT
+      value: "5758"
+    volumeMounts:
+    - name: data
+      mountPath: /data
+  volumes:
+  - name: data
+    emptyDir: {}
